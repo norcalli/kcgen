@@ -14,6 +14,7 @@ enum Input {
 struct Opts {
     input: Input,
     debug: bool,
+    skip_static: bool,
 }
 
 fn main() -> Result<()> {
@@ -21,10 +22,15 @@ fn main() -> Result<()> {
         use bpaf::*;
         let file = long("file").argument("FILE").map(Input::File);
         let stdin = long("stdin").req_flag(Input::StdIn);
-        let debug = long("debug").short('d').switch();
+        let debug = long("debug").switch();
+        let skip_static = long("skip_static").switch();
         let input: Parser<Input> = stdin.or_else(file);
         // let input: Parser<Input> = stdin.or_else(file).fallback(Input::StdIn);
-        let parser = construct!(Opts { input, debug });
+        let parser = construct!(Opts {
+            input,
+            debug,
+            skip_static
+        });
         Info::default()
             .descr("Parse a C header file for signatures")
             .for_parser(parser)
@@ -65,8 +71,8 @@ fn main() -> Result<()> {
   ((function_definition . (storage_class_specifier)? @scs declarator: (function_declarator (identifier) @name) body: (_)? @body) @def)
   ((function_definition . (storage_class_specifier)? @scs declarator: (pointer_declarator declarator: (function_declarator (identifier) @name)) body: (_)? @body) @def)
   ")?;
-  // ((declaration declarator: (function_declarator)) @fdecl)
-  // ((declaration declarator: (pointer_declarator declarator: (function_declarator))) @fdecl)
+    // ((declaration declarator: (function_declarator)) @fdecl)
+    // ((declaration declarator: (pointer_declarator declarator: (function_declarator))) @fdecl)
     // ((ERROR)+ @error)
     // ((comment)+ @comment)
     // (translation_unit (struct_specifier) @structdecl)
@@ -131,7 +137,7 @@ fn main() -> Result<()> {
         'skip_def: loop {
             if let Some(def) = captures[C::def] {
                 if let Some(scs) = captures[C::scs] {
-                    if node_str(scs).find("static").is_some() {
+                    if opts.skip_static && node_str(scs).find("static").is_some() {
                         break 'skip_def;
                     }
                 }
